@@ -17,11 +17,13 @@ import pandas as pd
 # Threshold definitions for the derived regime label.
 # These are based on observed ranges in our cleaned data and standard
 # automotive engineering conventions.
+# Threshold definitions for the derived regime label.
+# Tuned to the actual distribution observed in our 304k-row dataset.
 REGIME_THRESHOLDS = {
-    "rpm_idle_max":     1100,    # below this with no speed -> idle
-    "speed_idle_max":   2,       # km/h, accounts for sensor noise at zero
-    "speed_city_max":   60,      # km/h, urban driving threshold
-    "load_decel_max":   15,      # %, deceleration has very low load
+    "rpm_idle_max":      1100,    # below this with no speed -> idle
+    "speed_idle_max":    2,       # km/h, accounts for sensor noise at zero
+    "speed_city_max":    60,      # km/h, urban driving threshold
+    "throttle_decel_max": 17,     # %, at-rest throttle position is ~16-17%
 }
 
 
@@ -38,12 +40,19 @@ def add_derived_regime(df: pd.DataFrame) -> pd.DataFrame:
         decel     : moving but throttle closed (engine braking)
         city      : low-speed driving with throttle input
         highway   : sustained higher-speed driving
+
+    Note on deceleration detection:
+        We use THROTTLE position (not engine load) because OBD's
+        calculated engine load never drops below ~20% on a running
+        engine due to internal friction. Throttle position drops to
+        the closed/rest value (~16-17% in this car's reporting) the
+        moment the driver lifts off the pedal.
     """
     out = df.copy()
 
     rpm = out["ENGINE_RPM"]
     speed = out["VEHICLE_SPEED"]
-    load = out["ENGINE_LOAD"]
+    throttle = out["THROTTLE"]
 
     # Default to city - we'll overwrite the others
     regime = pd.Series("city", index=out.index)
@@ -55,14 +64,18 @@ def add_derived_regime(df: pd.DataFrame) -> pd.DataFrame:
     )
     regime[is_idle] = "idle"
 
-    # Deceleration: moving but engine load very low (foot off pedal)
+    # Deceleration: moving but driver has released the pedal
     is_decel = (
         (speed > REGIME_THRESHOLDS["speed_idle_max"]) &
-        (load <= REGIME_THRESHOLDS["load_decel_max"])
+        (throttle <= REGIME_THRESHOLDS["throttle_decel_max"])
     )
     regime[is_decel] = "decel"
 
-    # Highway: sustained higher speed
+    # Highway: sustained higher speed.
+    # Note: order matters - this overrides decel/city assignments.
+    # A car cruising at 80 km/h with foot lifted is still 'highway'
+    # for our regime purposes, since the physics of high-speed
+    # operation differ from low-speed regardless of throttle.
     is_highway = speed > REGIME_THRESHOLDS["speed_city_max"]
     regime[is_highway] = "highway"
 

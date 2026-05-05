@@ -108,7 +108,11 @@ def split_by_session(df: pd.DataFrame, val_fraction: float = 0.2,
     leakage that inflates validation metrics.
     """
     rng = np.random.default_rng(seed)
-    all_files = df["session_file"].unique()
+    # Convert to a plain numpy array so np.random.shuffle works correctly.
+    # Without this, pandas/Arrow-backed string types trigger a warning and
+    # can produce non-deterministic shuffling across pandas versions.
+    all_files = np.array(df["session_file"].unique(), dtype=str)
+    
     rng.shuffle(all_files)
 
     n_val = max(1, int(len(all_files) * val_fraction))
