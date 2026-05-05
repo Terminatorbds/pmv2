@@ -75,8 +75,9 @@ def plot_distributions_by_session(df: pd.DataFrame, save_path: Path):
     for i, col in enumerate(sensor_cols):
         ax = axes[i]
         for stype, color in zip(session_types, palette):
-            data = df.loc[df["session_type"] == stype, col].dropna()
-            if data.std() == 0 or len(data) < 10:
+            data = df.loc[df["session_type"] == stype, col].dropna()  # type: ignore[attr-defined]
+            # OLD: data = df.loc[df["session_type"] == stype, col].dropna()
+            if len(data) < 10 or data.std() == 0:
                 continue
             ax.hist(data, bins=40, alpha=0.45, label=stype,
                     color=color, density=True)
@@ -128,7 +129,8 @@ def find_strong_correlations(corr: pd.DataFrame, threshold: float = 0.85):
     for i in range(len(corr.columns)):
         for j in range(i + 1, len(corr.columns)):
             r = corr.iloc[i, j]
-            if abs(r) >= threshold:
+            if abs(r) >= threshold:  # type: ignore[operator]
+            # OLD: if abs(r) >= threshold:
                 pairs.append((corr.columns[i], corr.columns[j], r))
     pairs.sort(key=lambda x: abs(x[2]), reverse=True)
     return pairs

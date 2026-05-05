@@ -60,9 +60,13 @@ def main():
     train_regimes = train_df["regime"]
 
     thresholds = compute_per_regime_thresholds(
-        train_scores, train_regimes, percentile=99
+        np.asarray(train_scores), train_regimes, percentile=99
     )
-    global_threshold = float(np.percentile(train_scores, 99))
+    global_threshold = float(np.percentile(np.asarray(train_scores), 99))
+    # OLD: thresholds = compute_per_regime_thresholds(
+    # OLD:     train_scores, train_regimes, percentile=99
+    # OLD: )
+    # OLD: global_threshold = float(np.percentile(train_scores, 99))
 
     print("\nPer-regime thresholds (99th percentile of training scores):")
     print(f"  {'GLOBAL (old)':<15s} {global_threshold:.4f}")
@@ -74,14 +78,23 @@ def main():
     # The training anomaly rates per regime should be ~1% by
     # construction. The validation rates are the real evaluation.
     train_df["is_anomaly_v2"] = apply_per_regime_thresholds(
-        train_scores, train_regimes, thresholds, global_threshold
+        np.asarray(train_scores), train_regimes, thresholds, global_threshold
     )
     val_df["is_anomaly_v2"] = apply_per_regime_thresholds(
-        val_df["anomaly_score"].values,
+        np.asarray(val_df["anomaly_score"].values),
         val_df["regime"],
         thresholds,
         global_threshold,
     )
+    # OLD: train_df["is_anomaly_v2"] = apply_per_regime_thresholds(
+    # OLD:     train_scores, train_regimes, thresholds, global_threshold
+    # OLD: )
+    # OLD: val_df["is_anomaly_v2"] = apply_per_regime_thresholds(
+    # OLD:     val_df["anomaly_score"].values,
+    # OLD:     val_df["regime"],
+    # OLD:     thresholds,
+    # OLD:     global_threshold,
+    # OLD: )
 
     # 4. Compare old vs new anomaly rates per regime
     print("\nAnomaly rates - VALIDATION (the real test):")
@@ -153,7 +166,8 @@ def main():
     by_regime = (
         val_df.groupby("regime")["is_anomaly_v2"].mean() * 100
     ).sort_values(ascending=False)
-    ax.bar(by_regime.index, by_regime.values, color="steelblue")
+    ax.bar(by_regime.index, by_regime.to_numpy(), color="steelblue")
+    # OLD: ax.bar(by_regime.index, by_regime.values, color="steelblue")
     ax.axhline(overall_new, color="red", ls="--", lw=1,
                label=f"Overall = {overall_new:.2f}%")
     ax.set_ylabel("Anomaly rate (%)")

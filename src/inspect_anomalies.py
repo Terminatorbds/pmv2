@@ -112,7 +112,8 @@ def categorize_anomaly(contribution_row: pd.Series) -> str:
     if total_positive < 0.001:
         return "TRANSIENT"
 
-    top_cat = max(scores, key=scores.get)
+    top_cat = max(scores.keys(), key=lambda k: scores[k])
+    # OLD: top_cat = max(scores, key=scores.get)
     top_score = scores[top_cat]
 
     # If the top category accounts for less than 50% of positive
@@ -139,7 +140,8 @@ def explain_anomaly(
     lines.append("Top contributors:")
     for feat, contrib in top_contribs.items():
         if feat in raw_row.index:
-            raw_val = raw_row[feat]
+            raw_val = float(raw_row.loc[feat])  # type: ignore[index]
+            # OLD: raw_val = float(raw_row[feat])
             lines.append(f"  {feat:38s} value={raw_val:>10.3f}  contrib={contrib:+.4f}")
         else:
             lines.append(f"  {feat:38s}                      contrib={contrib:+.4f}")

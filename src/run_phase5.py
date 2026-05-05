@@ -54,7 +54,8 @@ def main():
     # 2. Train the model
     print("\nTraining Isolation Forest...")
     model = train_isolation_forest(X_train, contamination=0.01)
-    print(f"Trained {model.n_estimators} trees on {len(X_train):,} samples")
+    print(f"Trained {len(model.estimators_)} trees on {len(X_train):,} samples")
+    # OLD: print(f"Trained {model.n_estimators} trees on {len(X_train):,} samples")
 
     # 3. Save the trained model
     model_path = MODELS_DIR / "isolation_forest.joblib"
@@ -119,7 +120,8 @@ def main():
     by_regime = (
         val_df.groupby("regime")["is_anomaly"].mean() * 100
     ).sort_values(ascending=False)
-    ax.bar(by_regime.index, by_regime.values, color="steelblue")
+    ax.bar(by_regime.index, by_regime.to_numpy(), color="steelblue")
+    # OLD: ax.bar(by_regime.index, by_regime.values, color="steelblue")
     ax.axhline(val_anomaly_pct, color="red", ls="--", lw=1,
                label=f"Overall = {val_anomaly_pct:.2f}%")
     ax.set_ylabel("Anomaly rate (%)")
@@ -161,8 +163,10 @@ def main():
     metadata = {
         "n_train_rows": len(train_df),
         "n_val_rows": len(val_df),
-        "model_n_estimators": model.n_estimators,
-        "model_contamination": float(model.contamination),
+        "model_n_estimators": len(model.estimators_),
+        "model_contamination": 0.01,
+        # OLD: "model_n_estimators": model.n_estimators,
+        # OLD: "model_contamination": float(model.contamination),
         "decision_threshold": float(threshold),
         "train_anomaly_rate_pct": float(train_anomaly_pct),
         "val_anomaly_rate_pct": float(val_anomaly_pct),

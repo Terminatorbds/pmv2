@@ -146,13 +146,15 @@ def apply_per_regime_thresholds(
     production).
     """
     is_anomaly = np.zeros(len(scores), dtype=bool)
-    regimes_arr = regimes.values if hasattr(regimes, "values") else np.asarray(regimes)
+    regimes_arr = np.asarray(regimes)
+    # OLD: regimes_arr = regimes.values if hasattr(regimes, "values") else np.asarray(regimes)
 
     for regime, thresh in thresholds.items():
         mask = regimes_arr == regime
         is_anomaly[mask] = scores[mask] > thresh
 
-    unknown_regimes = set(np.unique(regimes_arr)) - set(thresholds.keys())
+    unknown_regimes = set(np.unique(regimes_arr).tolist()) - set(thresholds.keys())
+    # OLD: unknown_regimes = set(np.unique(regimes_arr)) - set(thresholds.keys())
     for regime in unknown_regimes:
         mask = regimes_arr == regime
         is_anomaly[mask] = scores[mask] > fallback_threshold
