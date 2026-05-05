@@ -101,3 +101,60 @@ def feature_contributions(
 
     contrib_df = pd.DataFrame(contributions, columns=feature_names, index=X.index)
     return contrib_df
+
+def compute_per_regime_thresholds(
+    scores: np.ndarray,
+    regimes: pd.Series,
+    percentile: float = 99,
+) -> dict:
+    """
+    Compute a separate decision threshold for each regime.
+
+    Why this matters:
+        A global threshold treats every regime equally, but our training
+        data is imbalanced (highway = 5% of rows, idle = 35%). The model
+        sees lots of idle examples and learns idle's "normal" tightly,
+        but sees few highway examples and is uncertain about highway -
+        causing it to over-flag highway samples. Per-regime thresholds
+        correct this by asking 'is this sample unusual FOR ITS REGIME?'
+        rather than 'is this sample unusual GLOBALLY?'
+
+    Returns a dict mapping regime name -> threshold value.
+    """
+    thresholds = {}
+    for regime in regimes.unique():
+        regime_scores = scores[regimes == regime]
+        if len(regime_scores) == 0:
+            continue
+        thresholds[regime] = float(np.percentile(regime_scores, percentile))
+    return thresholds
+
+
+def apply_per_regime_thresholds(
+    scores: np.ndarray,
+    regimes: pd.Series,
+    thresholds: dict,
+    fallback_threshold: float,
+) -> np.ndarray:
+    """
+    Flag each sample as anomalous if its score exceeds the threshold
+    for ITS regime.
+
+    The fallback_threshold handles regimes that exist at inference time
+    but weren't in training (defensive programming - shouldn't happen
+    given our regime taxonomy, but better safe than crashing in
+    production).
+    """
+    is_anomaly = np.zeros(len(scores), dtype=bool)
+    regimes_arr = regimes.values if hasattr(regimes, "values") else np.asarray(regimes)
+
+    for regime, thresh in thresholds.items():
+        mask = regimes_arr == regime
+        is_anomaly[mask] = scores[mask] > thresh
+
+    unknown_regimes = set(np.unique(regimes_arr)) - set(thresholds.keys())
+    for regime in unknown_regimes:
+        mask = regimes_arr == regime
+        is_anomaly[mask] = scores[mask] > fallback_threshold
+
+    return is_anomaly
