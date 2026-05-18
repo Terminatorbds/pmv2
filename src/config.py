@@ -27,21 +27,40 @@ SESSION_PREFIXES = {
     "long":  "long_trip",
 }
 
-# Columns to drop from the modeling dataset.
-#
-# These contribute nothing useful to anomaly detection because they are
-# either constant across all sessions, sensors that the firmware never
-# populated, or MIL/diagnostic counters that reflect historical state
-# rather than real-time engine behaviour.
-#
-# We will revisit this list after Phase 3's re-EDA on properly aligned
-# data - some of these may behave differently than they did in the
-# initial buggy view.
+# Columns dropped during loading - these contribute nothing useful for
+# anomaly detection because they are either constants across all sessions,
+# sensors the firmware never populated, or MIL/diagnostic counters that
+# reflect historical state rather than real-time engine behaviour.
 COLUMNS_TO_DROP = [
-    "COMMANDED_THROTTLE_ACTUATOR",        # was constant 0 in initial check
-    "COMMANDED_EVAPORATIVE_PURGE",        # was constant 0 in initial check
-    "TIME_SINCE_TROUBLE_CODES_CLEARED",   # was constant 0
-    "DISTANCE_TRAVELED_WITH_MIL_ON",      # was constant 255 (sensor max code)
-    "WARM_UPS_SINCE_CODES_CLEARED",       # was all-NaN in initial check
-    "TIME_RUN_WITH_MIL_ON",               # MIL counter, not real-time state
+    "COMMANDED_THROTTLE_ACTUATOR",
+    "COMMANDED_EVAPORATIVE_PURGE",
+    "TIME_SINCE_TROUBLE_CODES_CLEARED",
+    "DISTANCE_TRAVELED_WITH_MIL_ON",
+    "WARM_UPS_SINCE_CODES_CLEARED",
+    "TIME_RUN_WITH_MIL_ON",
 ]
+
+# Columns with no information beyond the constants above, identified
+# during Phase 3 EDA on properly aligned data.
+ZERO_INFORMATION_COLUMNS = [
+    "FUEL_AIR_COMMANDED_EQUIV_RATIO",   # 100% zero
+    "RELATIVE_THROTTLE_POSITION",       # 59% zero, unreliable
+]
+
+# Windowing parameters. Used by run_phase4 to slice the time-series
+# data into overlapping windows. See src/windowing.py for the algorithm.
+WINDOW_SIZE = 60       # samples = seconds at 1 Hz sampling rate
+WINDOW_STEP = 15       # 75% overlap between consecutive windows
+WINDOW_DROP_MIXED = True   # discard windows that span multiple regimes
+
+# Warmup filter: drop the first 60 seconds of each session.
+# During warmup, fuel trims aren't stable and the catalyst hasn't
+# lit off. Including this period would blur the model's notion of
+# normal steady-state operation.
+WARMUP_FILTER_SECONDS = 60
+
+# Train/validation split parameters.
+# val_fraction: 20% of sessions held out for evaluation.
+# random_seed: fixed for reproducibility.
+VAL_FRACTION = 0.2
+RANDOM_SEED = 42

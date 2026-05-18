@@ -48,7 +48,7 @@ SENSORS_FOR_WINDOWING = [
 ]
 
 
-def _compute_window_features(window: pd.DataFrame) -> dict:
+def _compute_window_features(window: pd.DataFrame) -> dict | None:
     """
     Compute aggregate features for a single window.
 
@@ -64,8 +64,10 @@ def _compute_window_features(window: pd.DataFrame) -> dict:
         - Coolant temp slope > 0 sustained = warming up or overheating
         - LTFT slope drifting upward = developing vacuum leak
         - Catalyst delta slope downward = catalyst degrading
+
+    Returns None if the window is too short to compute a slope.
     """
-    features = {}
+    features: dict = {}
 
     # Window length in samples - used for slope calculation
     n = len(window)
@@ -73,14 +75,19 @@ def _compute_window_features(window: pd.DataFrame) -> dict:
         return None  # Can't compute slope from < 2 points
 
     # Time axis for slope (just 0, 1, 2, ... n-1 since data is 1 Hz)
-    t = np.arange(n)
-    t_mean = t.mean()
-    t_var = ((t - t_mean) ** 2).sum()
+    t = np.arange(n, dtype=float)
+    t_mean = float(t.mean())
+    t_var = float(((t - t_mean) ** 2).sum())
 
     for sensor in SENSORS_FOR_WINDOWING:
         if sensor not in window.columns:
             continue
-        values = window[sensor].values
+
+        # Force conversion to a plain numpy float array so numpy
+        # functions see a fully-typed input. Pandas may return an
+        # Arrow-backed array otherwise, which numpy handles correctly
+        # at runtime but type checkers flag as ambiguous.
+        values = np.asarray(window[sensor].values, dtype=float)
 
         # Skip if all NaN (rare, but possible for sensors with glitches)
         if np.isnan(values).all():
@@ -92,18 +99,18 @@ def _compute_window_features(window: pd.DataFrame) -> dict:
             features[f"{sensor}_slope"] = np.nan
             continue
 
-        features[f"{sensor}_mean"] = np.nanmean(values)
-        features[f"{sensor}_std"] = np.nanstd(values)
-        features[f"{sensor}_min"] = np.nanmin(values)
-        features[f"{sensor}_max"] = np.nanmax(values)
+        features[f"{sensor}_mean"] = float(np.nanmean(values))
+        features[f"{sensor}_std"] = float(np.nanstd(values))
+        features[f"{sensor}_min"] = float(np.nanmin(values))
+        features[f"{sensor}_max"] = float(np.nanmax(values))
         features[f"{sensor}_range"] = features[f"{sensor}_max"] - features[f"{sensor}_min"]
 
         # Linear slope via least-squares.
         # slope = sum((t - t_mean) * (v - v_mean)) / sum((t - t_mean)^2)
         # We use a manual computation rather than np.polyfit because
         # this is ~10x faster when called thousands of times.
-        v = values - np.nanmean(values)
-        cov = np.nansum((t - t_mean) * v)
+        v = values - float(np.nanmean(values))
+        cov = float(np.nansum((t - t_mean) * v))
         features[f"{sensor}_slope"] = cov / t_var if t_var > 0 else 0.0
 
     return features
