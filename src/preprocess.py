@@ -59,6 +59,18 @@ MODEL_FEATURES = [
     "LOAD_PER_RPM",
 ]
 
+# Window-level model features.
+# Built dynamically: for each sensor in SENSORS_FOR_WINDOWING, we have
+# 6 statistics (mean, std, min, max, range, slope) = 132 total features.
+# The exact list is generated from windowing.SENSORS_FOR_WINDOWING at
+# the time the windowed dataset is built, so we don't hardcode it here.
+WINDOW_STATISTICS = ["mean", "std", "min", "max", "range", "slope"]
+
+
+def get_window_feature_names(sensors: list) -> list:
+    """Return the full list of windowed feature column names."""
+    return [f"{s}_{stat}" for s in sensors for stat in WINDOW_STATISTICS]
+
 
 def build_preprocessing_pipeline() -> Pipeline:
     """
